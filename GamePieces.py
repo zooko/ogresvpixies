@@ -22,12 +22,9 @@
 # See the file COPYING or visit http://www.gnu.org/ for details.
 
 # CVS:
-__cvsid = '$Id: GamePieces.py,v 1.2 2002/01/29 22:48:48 zooko Exp $'
+__cvsid = '$Id: GamePieces.py,v 1.3 2002/01/30 00:19:17 zooko Exp $'
 
 import path_fix
-version = (1, 1, 0)
-verstr = '.'.join(map(str, version))
-name = "Ogres vs. Cellular Automata"
 
 # standard Java modules
 import java
@@ -470,18 +467,19 @@ class Tree(Graphical):
 		# print "Tree.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		Graphical.__init__(self, ovp, hex, treadable=treadable, color=color)
 		for adjhex in hex.get_adjacent_hexes():
+			# Destroy any adjacent stones.
+			[x.destroy() for x in adjhex.get_all(Stone)]
+
 			# Now check if this new tree just formed a Broken Pixie Ring.  If so, create a 3-Pixie there.
 			if adjhex.is_center_of_broken_pixie_ring():
 				# WHOO!  A BROKEN PIXIE RING!  Remove any Stones and create a 3-Pixie in the center of the Fairie Ring.
 				[x.destroy() for x in adjhex.get_all(Tree)]
-				[x.destroy() for x in adjhex.get_all(Stone)]
 				Pixie(ovp, adjhex, hp=3)
 
 			# Now check if this new tree just formed a Pixie Ring.  If so, create a Pixie there.
 			if adjhex.is_center_of_pixie_ring():
 				# WHOO!  A PIXIE RING!  Remove any Stones and create a Pixie in the center of the Fairie Ring.
 				[x.destroy() for x in adjhex.get_all(Tree)]
-				[x.destroy() for x in adjhex.get_all(Stone)]
 				Pixie(ovp, adjhex)
 
 	def paint(self, g):

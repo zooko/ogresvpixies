@@ -22,11 +22,9 @@
 # See the file COPYING or visit http://www.gnu.org/ for details.
 
 # CVS:
-__cvsid = '$Id: OvP.py,v 1.2 2002/01/29 22:48:48 zooko Exp $'
+__cvsid = '$Id: OvP.py,v 1.3 2002/01/30 00:19:17 zooko Exp $'
 
 import path_fix
-version = (0, 0, 2,)
-verstr = '.'.join(map(str, version))
 
 # standard Java modules
 import java
@@ -55,6 +53,10 @@ from util import *
 true = 1
 false = 0
 
+version = (1, 1, 1)
+verstr = '.'.join(map(str, version))
+name = "Ogres vs. Cellular Automata"
+
 NUM_STARTING_OGRES=2
 NUM_STARTING_PIXIES=2
 NUM_STARTING_TREES=22
@@ -79,7 +81,7 @@ class OvPHex(HexBoard.Hex):
 
 class OvP(JFrame, MouseListener, KeyListener, Runnable):
 	def __init__(self, boardwidth=16, boardheight=12, randseed=None):
-		JFrame.__init__(self, 'Ogres vs. Gardening Pixies [Version: %s]' % verstr)
+		JFrame.__init__(self, name + " v" + verstr)
 		if randseed == None:
 			randseed = int(time.time())
 		print "randseed: ", randseed
