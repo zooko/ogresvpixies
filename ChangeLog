@@ -1,0 +1,5 @@
+v0.0.2:
+
+	* Pixies can pick things up and drop them
+	* Ogres can destroy rocks (rocks have 1 hit point, 2 defense dice)
+	* when an Ogre eats a tree, all adjacent trees immediately die of fright
