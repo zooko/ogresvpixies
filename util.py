@@ -1,16 +1,39 @@
 #!/usr/bin/env python
 
-CVS_ID = '$Id: util.py,v 1.1 2002/01/25 16:36:01 zooko Exp $'
+CVS_ID = '$Id: util.py,v 1.2 2002/02/09 22:46:13 zooko Exp $'
 
 from types import *
 import random
 from UserDict import UserDict
+
+# standard Java modules
+import java
+from java.lang import *
+from java.awt import *
+from java.awt.event import *
+from java.awt.geom import *
+from javax.swing import *
+from javax.swing.text import *
+
+from java.awt.image import ImageObserver # debug
 
 class Trivial:
     """
     Occasionally it's nice to have this trivial class.
     """
     pass
+
+class Runner(Runnable):
+	"""
+	To pass a method and args to the stupid O-O Java API.
+	"""
+	def __init__(self, func, args=(), kwargs={}):
+		self.func = func
+		self.args = args
+		self.kwargs = kwargs
+
+	def run(self):
+		apply(self.func, self.args, self.kwargs)
 
 class AttributeMap (UserDict):
 	def __getattr__(self, name):
@@ -30,6 +53,10 @@ def rand_float(X):
 
 def rand_int(X):
 	return int(rand_float(X))
+
+def rand_rotate(list):
+	i = rand_int(len(list))
+	return list[i:] + list[:i]
 
 def probable_apply(probability, func, args=(), kwargs=None):
 	"""

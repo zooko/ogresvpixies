@@ -1,27 +1,25 @@
 #!/usr/bin/env jython
 
-CVS_ID = '$Id: test.py,v 1.2 2002/02/09 22:46:13 zooko Exp $'
+CVS_ID = '$Id: testCAvCA.py,v 1.1 2002/02/09 22:46:13 zooko Exp $'
 
 import path_fix # hack for nathan's box
 
-import HexBoard
-import GamePieces
-import OvP
-import Game
-import Images
 import util
+import HexBoard
+import Game
+import CAvCAPieces
+import CAvCA
 
 os = []
 
 class B:
 	def __call__(self, randseed=None, os=os):
-		reload(HexBoard)
-		reload(GamePieces)
-		reload(OvP)
-		reload(Game)
-		reload(Images)
 		reload(util)
-		os.append(OvP.OvP(randseed=randseed))
+		reload(HexBoard)
+		reload(Game)
+		reload(CAvCAPieces)
+		reload(CAvCA)
+		os.append(CAvCA.CAvCA(randseed=randseed))
 
 	def __repr__(self, os=os, randseed=None):
 		self.__call__(randseed=randseed)
@@ -59,3 +57,5 @@ class R:
 
 randseed = None
 r=R(randseed=randseed)
+
+r()

@@ -22,7 +22,7 @@
 # See the file COPYING or visit http://www.gnu.org/ for details.
 
 # CVS:
-__cvsid = '$Id: GamePieces.py,v 1.5 2002/02/09 22:46:13 zooko Exp $'
+__cvsid = '$Id: WarPieces.py,v 1.1 2002/02/09 22:46:13 zooko Exp $'
 
 import path_fix
 
@@ -57,6 +57,11 @@ class Flying:
 		# print "Flying.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		pass
 
+class Big:
+	def __init__(self):
+		# print "Big.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
+		pass
+
 class Item:
 	def __init__(self, game, hex, treadable):
 		"""
@@ -88,18 +93,28 @@ class Item:
 			return isinstance(treader, Flying)
 
 	def __repr__(self):
-		return "%s <%x> at %s" % (self.__class__.__name__, id(self), self.hex,)
+		return "%s at %s" % (self.__class__.__name__, self.hex,)
 
 	def repaint(self):
 		self.hex.repaint()
+
+	def paint(self, g):
+		mg = g.create()
+		str = self.__class__.__name__
+		if isinstance(self, Attackable) and self.is_dead():
+			str = "dead " + str
+		(font, ox, oy,) = self.hb.find_fitting_font_bottom_half(str, mg)
+		mg.setColor(Color.white)
+		mg.setFont(font)
+		mg.drawString(str, ox, oy)
 
 	def destroy(self):
 		self.hex.items.remove(self)
 		self.repaint()
 
-class OvPImageObserver(ImageObserver):
+class OurImageObserver(ImageObserver):
 	def __init__(self, hb):
-		# print "OvPImageObserver.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
+		# print "OurImageObserver.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		self.hb = hb
 
 	def imageUpdate(self, img, infoflags, x, y, width, height):
@@ -122,19 +137,22 @@ class Graphical (Item):
 		self.image = image or self.IMAGEDEFAULT or Images.getImageCache().get(self.__class__.__name__)
 		self.color = color
 		Item.__init__(self, game, hex, treadable)
-		self.imageobserver = OvPImageObserver(self.hb)
+		self.imageobserver = OurImageObserver(self.hb)
 
 	def paint(self, g):
+		mg = g.create()
 		if self.image is not None:
 			#print "[Debug:] Graphical.paint(self=%r, g); self.image = %r" % (self, self.image)
 			dx, dy, dw, dh = unpack_rect(self.hex.boundingrect)
 			sx, sy, sw, sh = 0, 0, self.image.getWidth(self.imageobserver), self.image.getHeight(self.imageobserver)
 			pad = self.IMAGEPADDING
-			g.drawImage(self.image,
+			mg.drawImage(self.image,
 						pad, pad, dw-pad, dh-pad,
 						sx, sy, sx+sw, sy+sh,
 						Color(0, 0, 0, 0), # An alpha of 0; does not seem to work.
 						self.imageobserver)
+		else:
+			Item.paint(self, g)
 
 class Active(Graphical):
 	def __init__(self):
@@ -158,7 +176,7 @@ class Active(Graphical):
 		@return `true' if the event was consumed
 		"""
 		if not Item.mouse_pressed(self):
-			if not self.is_dead():
+			if not (isinstance(self, Attackable) and self.is_dead()):
 				# Select this item.
 				self.select()
 				return true
@@ -195,9 +213,9 @@ DEFAULT_NUM_SPLATTERS=8
 class Attackable(Graphical):
 	IMAGEDEAD = None
 	
-	def __init__(self, hp, defense, numsplatters=DEFAULT_NUM_SPLATTERS, bloodcolor=Color.red, deadimage=None):
+	def __init__(self, hp, defensep, numsplatters=DEFAULT_NUM_SPLATTERS, bloodcolor=Color.red, deadimage=None):
 		# print "Attackable.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
-		self.defensedice = defense
+		self.defensep = defensep
 		self.hp = hp
 		self.highhp = self.hp # the high water mark for hp
 		self.numsplatters = numsplatters
@@ -210,7 +228,7 @@ class Attackable(Graphical):
 		if self.is_dead():
 			return "dead " + Item.__repr__(self)
 		else:
-			return Item.__repr__(self) + ", hp: %s" % self.hp
+			return Item.__repr__(self)
 
 	def paint(self, g):
 		mg = g.create()
@@ -227,16 +245,13 @@ class Attackable(Graphical):
 				mg.setFont(font)
 				mg.drawString(strhp, ox, oy)
 
-	def handle_attack(self, attdice):
-		defdice = []
-		for i in range(self.defensedice):
-			defdice.append(d6())
-		defdice.sort()
-		defdice.reverse()
-		# print "%s.attack(%s): attdice: %s, defdice: %s" % (self, defender, attdice, defdice,)
-		if attdice[0] > defdice[0]:
+	def handle_attack(self, attackval, damage, attacker):
+		defenseroll = d6() + d6() + d6()
+		defenseval = defenseroll + self.defensep
+		print "%2s + %2s = %2s" % (defenseroll, self.defensep, defenseval,),
+		if attackval > defenseval:
 			# hit!
-			self.take_damage(1)
+			self.take_damage(damage)
 		else:
 			print "missed..."
 
@@ -280,33 +295,59 @@ class Attackable(Graphical):
 			return true
 		return Item.is_treadable(self, treader)
 
-class Stone(Attackable):
-	def __init__(self, game, hex, treadable="flying only", color=Color.gray):
+class Wall(Attackable):
+	def __init__(self, game, hex, treadable="none", color=Color.gray):
 		"""
 		@precondition `hex' must not be None.: hex is not None
 		"""
 		assert hex is not None, "precondition: `hex' must not be None."
 
-		# print "Stone.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
-		Attackable.__init__(self, hp=1, defense=1, numsplatters=0, bloodcolor=color)
+		# print "Wall.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
+		Attackable.__init__(self, hp=3, defensep=-2, numsplatters=0, bloodcolor=Color.lightGray)
 		Graphical.__init__(self, game, hex, treadable, color=color)
 
 	def paint(self, g):
-		Graphical.paint(self, g)
-		Attackable.paint(self, g)
+		#Graphical.paint(self, g)
+		#Attackable.paint(self, g)
 		mg = g.create()
 		mg.setColor(self.color)
 		d=self.hb.s/2
-		mg.fillOval(self.hb.w/2-d/2, self.hb.h/2-d/2, d, d)
+		mg.fill(self.hb.hexpoly)
+		mg.setColor(self.bloodcolor)
+		for (x, y, d,) in self.splatters:
+			mg.fillOval(x, y, d, d)
+
+	def handle_attack(self, attackval, damage, attacker):
+		if not (isinstance(attacker, Big) or isinstance(attacker, Dwarf)):
+			print "I'm sorry, this wall can only be harmed by Big creatures or Dwarfs."
+			damage = 0
+		Attackable.handle_attack(self, attackval, damage, attacker)
+
+	def take_damage(self, amount):
+		if amount == 0:
+			# print "%s.take_damage(%s): Nyah nyah nyah nyah NYAH nyah!" % (self, amount,)
+			print
+			return
+		print "%s.take_damage(%s): Ouch!" % (self, amount,)
+		self.hp = self.hp - amount
+		x = int(self.IMAGEPADDING + rand_float(self.hb.w - self.IMAGEPADDING*2))
+		y = int(self.IMAGEPADDING + rand_float(self.hb.h - self.IMAGEPADDING*2))
+		r = int(1 + rand_float(rand_float(self.hb.s*0.4)))
+		self.splatters.append((x, y, r,))
+		if len(self.splatters) > self.highhp:
+			self.splatters = self.splatters[:-self.highhp]
+		self.hex.repaint()
+		if self.hp <= 0:
+			self.die()
 
 	def die(self):
 		Attackable.die(self)
 		# remove entirely
 		self.hex.items.remove(self)
 		self.hex.repaint()
-		
+
 class Creature(Attackable, Active):
-	def __init__(self, turnman, hex, hp, actpoints, attack, defense, numsplatters=DEFAULT_NUM_SPLATTERS, color=Color.black, bloodcolor=Color.red, deadimage=None):
+	def __init__(self, turnman, hex, hp, actpoints, attackp, defensep, damagep=1, numsplatters=DEFAULT_NUM_SPLATTERS, color=Color.black, bloodcolor=Color.red, deadimage=None):
 		"""
 		@param hex the hex the creature inhabits
 		@param hp starting hit points
@@ -315,19 +356,23 @@ class Creature(Attackable, Active):
 		# print "Creature.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		self.turnman = turnman
 		self.actp = actpoints
-		self.attackdice = attack
+		self.attackp = attackp
+		self.damagep = damagep
 		self.actpleft = 0 # invalid value
 		turnman.game.creatures[color].append(self)
 		turnman.register_regular_bot_event(self.handle_new_turn, priority="first")
 		Active.__init__(self)
-		Attackable.__init__(self, hp=hp, defense=defense, numsplatters=numsplatters, bloodcolor=bloodcolor, deadimage=deadimage)
+		Attackable.__init__(self, hp=hp, defensep=defensep, numsplatters=numsplatters, bloodcolor=bloodcolor, deadimage=deadimage)
 		Graphical.__init__(self, turnman.game, hex, treadable="none", color=color)
 
 	def __repr__(self):
 		if self.is_dead():
 			return "dead " + Item.__repr__(self)
 		else:
-			return Item.__repr__(self) + ", actpleft: %s" % self.actpleft
+			return Item.__repr__(self)
+
+	def price(self):
+		return (self.attackp + 3) * self.actp + self.hp + (self.defensep + 3)
 
 	def paint(self, g):
 		Graphical.paint(self, g)
@@ -335,7 +380,7 @@ class Creature(Attackable, Active):
 		Active.paint(self, g)
 
 	def is_foe(self, item):
-		return isinstance(item, Creature) and (item.__class__ is not self.__class__)
+		return isinstance(item, Creature) and (item.color is not self.color)
 
 	def handle_new_turn(self):
 		# print "%s.handle_new_turn()" % self
@@ -387,7 +432,7 @@ class Creature(Attackable, Active):
 				# print "blocked by %s" % item
 				blocked = true
 		if not blocked:
-			self.act(self.move, kwargs={'hex': hex})
+			self.act_and_be_done_if_done(self.move, kwargs={'hex': hex})
 			return
 
 		# Else, if you can attack an item, attack the first one it (top items first):
@@ -396,7 +441,7 @@ class Creature(Attackable, Active):
 			if isinstance(item, Attackable):
 				# WHAH?  Won't let me MOVE there, EH?  We'll see about that!
 				# print "attacking %s" % item
-				self.act(self.attack, kwargs={'defender': item})
+				self.act_and_be_done_if_done(self.attack, kwargs={'defender': item})
 				return
 
 		assert self.actpleft > 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
@@ -404,15 +449,26 @@ class Creature(Attackable, Active):
 		# Else, you can't do anything to that hex.
 		self.handle_cant_act()
 
+	def act_and_be_done_if_done(self, act, args=(), kwargs={}):
+		assert self.actpleft > 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
+		self.actpleft -= 1
+		assert self.actpleft >= 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
+		apply(act, args, kwargs)
+		assert self.actpleft >= 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
+		self.be_done_if_done()
+
 	def act(self, act, args=(), kwargs={}):
 		assert self.actpleft > 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
 		self.actpleft -= 1
 		assert self.actpleft >= 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
 		apply(act, args, kwargs)
 		assert self.actpleft >= 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
+
+	def be_done_if_done(self):
+		assert self.actpleft >= 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
 		if self.actpleft <= 0:
 			self.turnman.select_next_creature_or_end_turn()
-		
+
 	def move(self, hex):
 		"""
 		exit the old hex, move onto the top of the stack of the new one, check for ZoC, repaint
@@ -431,17 +487,47 @@ class Creature(Attackable, Active):
 		self.repaint() # repaint the new
 
 	def attack(self, defender):
-		attdice = []
-		for i in range(self.attackdice):
-			attdice.append(d6())
-		attdice.sort()
-		attdice.reverse()
-		defender.handle_attack(attdice)
+		roll = d6() + d6() + d6()
+		attackval = roll + self.attackp
+		print "attack: %2s + %2s = %2s " % (roll, self.attackp, attackval,),
+		defender.handle_attack(attackval, self.damagep, self)
 
-class Ogre(Creature):
-	def __init__(self, game, hex, bloodcolor=Color.red):
+	def key_typed(self, e):
+		c = e.getKeyChar()
+		if c == 'w':
+			self.user_act(self.hex.get_nw())
+		elif c == 'e':
+			self.user_act(self.hex.get_ne())
+		elif c == 'a':
+			self.user_act(self.hex.get_w())
+		elif c == 'd':
+			self.user_act(self.hex.get_e())
+		elif c == 'z':
+			self.user_act(self.hex.get_sw())
+		elif c == 'x':
+			self.user_act(self.hex.get_se())
+		elif c == 's':
+			self.user_act(self.hex)
+		elif c == 'u':
+			self.unselect()
+		elif c == 'n':
+			self.turnman.select_next_creature_or_end_turn()
+		elif c == ' ':
+			self.pass()
+
+class Ogre(Creature, Big):
+	"""
+	An ogre is very tough and powerful and it eats corpses for extra hit points.
+
+	hp: 3
+	actpoints: 1
+	attackp: 3
+	defensep: 2
+	"""
+	def __init__(self, game, hex, color=Color.red):
 		# print "Ogre.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
-		Creature.__init__(self, game.turnmans[Color.red], hex, hp=3, actpoints=1, attack=3, defense=2, color=Color.red, bloodcolor=bloodcolor)
+		Creature.__init__(self, game.turnmans[color], hex, hp=3, actpoints=1, attackp=3, defensep=2, damagep=2, color=color, bloodcolor=Color.red)
+		Big.__init__(self)
 
 	def move(self, hex):
 		Creature.move(self, hex)
@@ -450,8 +536,7 @@ class Ogre(Creature):
 				self.eat(i)
 
 	def eat(self, item):
-		if isinstance(item, KingTree):
-			print "OGRES WIN!  THIS IS THE KING TREE!  MUNCHMUNCHMUNCH!"
+		print "OGRE EAT %s" % item
 		item.destroy()
 		self.hp += 1
 		if self.hp > self.highhp:
@@ -464,8 +549,8 @@ class Tree(Graphical):
 		Graphical.__init__(self, game, hex, treadable=treadable, color=color)
 		self.age = 0
 		for adjhex in hex.get_adjacent_hexes():
-			# Destroy any adjacent stones.
-			[x.destroy() for x in adjhex.get_all(Stone)]
+			# Destroy any adjacent Wall.
+			[x.destroy() for x in adjhex.get_all(Wall)]
 
 	def get_older(self):
 		self.age += 1
@@ -494,11 +579,22 @@ class KingTree(Tree):
 		Tree.__init__(self, game, hex, treadable=treadable, color=color)
 
 class Pixie(Creature, Flying):
+	"""
+	A pixie is very fast.
+
+	hp: 1
+	actpoints: 3
+	attackp: 0
+	defensep: 0
+	"""
 	def __init__(self, game, hex, color=Color.white, hp=1, bloodcolor=Color(0.7, 1.0, 0.3)):
 		# print "Pixie.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		self.carrieditems = []
-		Creature.__init__(self, game.turnmans[color], hex, hp=hp, actpoints=3, attack=1, defense=1, color=color, bloodcolor=bloodcolor)
+		Creature.__init__(self, game.turnmans[color], hex, hp=hp, actpoints=3, attackp=0, defensep=0, color=color, bloodcolor=bloodcolor)
 		Flying.__init__(self)
+
+	def price(self):
+		return 10
 
 	def garden(self):
 		"""
@@ -526,3 +622,152 @@ class Pixie(Creature, Flying):
 			self.repaint()
 			self.hex.repaint()
 
+class Dwarf(Creature):
+	"""
+	A dwarf is tough and gets an extra defense point against Big attackers.  
+
+	hp: 3
+	actpoints: 1
+	attackp: 2
+	defensep: 1
+	"""
+	def __init__(self, game, hex, color=Color.blue):
+		Creature.__init__(self, game.turnmans[color], hex, hp=3, actpoints=1, attackp=2, defensep=2, color=color, bloodcolor=Color.red)
+
+	def handle_attack(self, attackval, damage, attacker):
+		if isinstance(attacker, Big):
+			self.defensep += 1
+			Attackable.handle_attack(self, attackval, damage, attacker)
+			self.defensep -= 1
+		else:
+			Attackable.handle_attack(self, attackval, damage, attacker)
+
+class Skeleton(Creature):
+	"""
+	A skeleton is weak but fast.
+
+	hp: 1
+	actpoints: 2
+	attackp: 1
+	defensep: 1
+	"""
+	def __init__(self, game, hex, color=Color.blue):
+		Creature.__init__(self, game.turnmans[color], hex, hp=1, actpoints=2, attackp=1, defensep=1, color=color, bloodcolor=Color.red)
+
+class LightningAttack(Runnable):
+	def __init__(self, hb, source, targethex, be_done_func=None):
+		self.hb = hb
+		self.source = source
+		self.targethex = targethex
+		self.be_done_func = be_done_func
+		self.attacklets = 0
+		# calculate shortest path from here to there
+		self.path = HexBoard.shortest_path((source.hex.hx, source.hex.hy,), (targethex.hx, targethex.hy,), 8)
+		self.go()
+
+	def paint(self, g):
+		pass
+
+	def go(self):
+		# schedule the first attacklet
+		SwingUtilities.invokeLater(self)
+
+	def attacklet(self):
+		self.attacklets += 1
+		for hc in self.path:
+			hex = self.hb.hexes.get(hc)
+			if hex is not None:
+				hex.highlight()
+				hex.repaint()
+				for item in hex.items:
+					if isinstance(item, Attackable) and not item.is_dead():
+						item.handle_attack(15, 1, self)
+						return
+
+	def run(self):
+		self.attacklet()
+		if self.attacklets < 3:
+			# schedule another attacklet
+			SwingUtilities.invokeLater(self)
+		else:
+			# done.
+			for hc in self.path:
+				hex = self.hb.hexes.get(hc)
+				if hex is not None:
+					hex.unhighlight()
+					hex.repaint()
+
+			# call back to do whatever comes next
+			# print "%s.%s()" % (self, self.be_done_func,)
+			if self.be_done_func:
+				self.be_done_func()
+
+class Wizard(Creature):
+	"""
+	A wizard is weak, slow, and vulnerable, but he casts spells!
+
+	hp: 1
+	actpoints: 1
+	attackp: -2
+	defensep: -2
+	"""
+	def __init__(self, game, hex, color=Color.blue):
+		Creature.__init__(self, game.turnmans[color], hex, hp=1, actpoints=1, attackp=-2, defensep=-2, color=color, bloodcolor=Color.red)
+		self.waitingfortarget = false
+
+	def price(self):
+		return 35
+
+	def cast_lightning_bolt(self):
+		print "%s.cast_lightning_bolt()" % self
+		self.waitingfortarget = true
+		self.completionfunc = (self.complete_cast_lightning_bolt, (), {},)
+
+	def complete_cast_lightning_bolt(self, hex):
+		print "hex: %s, ZZZZzzzap!!!" % hex
+		la = LightningAttack(self.hb, self, hex, self.be_done_if_done)
+
+	def key_typed(self, e):
+		c = e.getKeyChar()
+		if c == 's':
+			print "%s trying to cast lightning bolt!" % self
+			for adjhex in self.hex.get_adjacent_hexes():
+				for item in adjhex.items:
+					if isinstance(item, Creature) and not item.is_dead() and item.is_foe(self):
+						print "Can't cast -- adjacent to enemy!"
+						return
+			self.cast_lightning_bolt()
+		else:
+			Creature.key_typed(self, e)
+
+	def user_act(self, hex):
+		if hex is None:
+			return
+
+		# If it is ourself, then ignore this event.
+		if hex is self.hex:
+			return
+
+		assert self.actpleft >= 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
+		if self.actpleft <= 0:
+			print "can't do any more acts this turn"
+			return self.handle_cant_act()
+
+		assert self.actpleft > 0, "self: %s, self.actpleft: %s, traceback.extract_stack(): %s" % (self, self.actpleft, traceback.extract_stack(),)
+
+		if self.waitingfortarget:
+			self.waitingfortarget = false
+			kw = self.completionfunc[2]
+			kw['hex'] = hex
+			self.act(self.completionfunc[0], self.completionfunc[1], kw)
+		else:
+			Creature.user_act(self, hex)
+
+class Scroll(Graphical):
+	def __init__(self, game, hex, color=Color.white, image=None):
+		Graphical.__init__(self, game, hex, treadable="any", color=color)
+
+	def paint(self, g):
+		mg = g.create()
+		mg.setColor(self.color)
+		mg.fill(self.hb.scrollpoly)

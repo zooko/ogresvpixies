@@ -1,27 +1,31 @@
 #!/usr/bin/env jython
 
-CVS_ID = '$Id: test.py,v 1.2 2002/02/09 22:46:13 zooko Exp $'
+CVS_ID = '$Id: testWar.py,v 1.1 2002/02/09 22:46:13 zooko Exp $'
 
 import path_fix # hack for nathan's box
 
+import util
 import HexBoard
-import GamePieces
-import OvP
+import WarPieces
+import BlueArmy
+import RedArmy
+import War
 import Game
 import Images
-import util
 
 os = []
 
 class B:
 	def __call__(self, randseed=None, os=os):
+		reload(util)
 		reload(HexBoard)
-		reload(GamePieces)
-		reload(OvP)
+		reload(WarPieces)
+		reload(BlueArmy)
+		reload(RedArmy)
+		reload(War)
 		reload(Game)
 		reload(Images)
-		reload(util)
-		os.append(OvP.OvP(randseed=randseed))
+		os.append(War.War(randseed=randseed))
 
 	def __repr__(self, os=os, randseed=None):
 		self.__call__(randseed=randseed)

@@ -1,4 +1,4 @@
-CVS_ID = '$Id: HexBoard.py,v 1.2 2002/01/29 22:48:48 zooko Exp $'
+CVS_ID = '$Id: HexBoard.py,v 1.3 2002/02/09 22:46:13 zooko Exp $'
 
 import java
 from java.awt import *
@@ -144,10 +144,12 @@ class Hex:
 	def highlight(self):
 		"""Sets the highlight flag of this hex."""
 		self.highlightflag = 1
+		self.repaint()
 
 	def unhighlight(self):
 		"""Clears the highlight flag of this hex."""
 		self.highlightflag = 0
+		self.repaint()
 
 	def is_highlighted(self):
 		return self.highlightflag
@@ -177,16 +179,29 @@ class Hex:
 		return ((abs(otherhex.hx-self.hx)==1) and (otherhex.hy==self.hy)) or ((abs(otherhex.hy-self.hy)==1) and (((otherhex.hx==self.hx)) or (otherhex.hx-self.hx==((self.hy % 2)*2-1))))
 
 	def is_adjacent_to_a(self, klass):
+		return self.count_adjacent(klass) > 0
+
+	def count_adjacent(self, klass):
+		sum = 0
 		for adj in self.get_adjacent_hexes():
 			if adj.contains_a(klass):
-				return true
-		return false
+				sum += 1
+		return sum
 
 	def get_adjacent_hexes(self):
-		# XXX speed me up please!
-		return filter(self.is_adjacent, self.hb.hexes.values())
+		"""
+		excludes Nones
+		"""
+		res = []
+		for (dx, dy,) in ( (-1, 0), (1, 0), (0, 1), (0, -1), (((self.hy % 2)*2-1), 1), (((self.hy % 2)*2-1), -1) ,):
+			if self.hb.hexes.has_key((self.hx+dx, self.hy+dy,)):
+				res.append(self.hb.hexes[(self.hx+dx, self.hy+dy,)])
+		return res
 
 	def get_ordered_adjacent_hexes(self):
+		"""
+		includes Nones
+		"""
 		return (self.get_nw(), self.get_ne(), self.get_e(), self.get_se(), self.get_sw(), self.get_w(),)
 
 	def get_east_trio(self):
@@ -214,7 +229,7 @@ class Hex:
 			return middlehex.get_w()
 		if middlehex.get_w() is self:
 			return middlehex.get_nw()
-
+		
 	def get_circle_predecessor(self, middlehex):
 		"""
 		@returns the hex that is the next hex from `self' in the circle that surrounds `middlehex' (in a counter-clockwise direction)
@@ -341,8 +356,8 @@ class HexBoard(JPanel):
 		self.hexbottomhalfpoly.addPoint(0, self.h/2)
 
 		self.treepoly = Polygon()
-		TREEHEIGHT=int(self.h*0.4)
-		TREEWIDTH=int(self.w*0.3)
+		TREEHEIGHT = int(self.h*0.4)
+		TREEWIDTH = int(self.w*0.3)
 		self.treepoly.addPoint(self.w/2, (self.h-TREEHEIGHT)/2)
 		self.treepoly.addPoint((self.w+TREEWIDTH)/2, (self.h+TREEHEIGHT)/2)
 		self.treepoly.addPoint((self.w-TREEWIDTH)/2, (self.h+TREEHEIGHT)/2)
@@ -350,6 +365,14 @@ class HexBoard(JPanel):
 		self.treeinnerpoly.addPoint(self.w/2, (self.h-TREEHEIGHT)/2+1)
 		self.treeinnerpoly.addPoint((self.w+TREEWIDTH)/2-1, (self.h+TREEHEIGHT)/2-1)
 		self.treeinnerpoly.addPoint((self.w-TREEWIDTH)/2+1, (self.h+TREEHEIGHT)/2-1)
+
+		self.scrollpoly = Polygon()
+		SCROLLHEIGHT = int(self.h*0.4)
+		SCROLLWIDTH = int(self.w*0.3)
+		self.scrollpoly.addPoint(self.w/2, (self.h-SCROLLHEIGHT)/2)
+		self.scrollpoly.addPoint(self.w/2+self.s/4, (self.h-SCROLLHEIGHT)/2+self.s/8)
+		self.scrollpoly.addPoint(self.w/2+self.s/4, (self.h-SCROLLHEIGHT)/2+SCROLLHEIGHT+self.s/8)
+		self.scrollpoly.addPoint(self.w/2, (self.h-SCROLLHEIGHT)/2+SCROLLHEIGHT)
 
 		self.hexes = {} # key: (hx, hy,), value = instance of Hex
 
