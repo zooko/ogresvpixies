@@ -22,11 +22,12 @@
 # See the file COPYING or visit http://www.gnu.org/ for details.
 
 # CVS:
-__cvsid = '$Id: GamePieces.py,v 1.1 2002/01/25 16:36:01 zooko Exp $'
+__cvsid = '$Id: GamePieces.py,v 1.2 2002/01/29 22:48:48 zooko Exp $'
 
 import path_fix
-version = (1, 0)
+version = (1, 1, 0)
 verstr = '.'.join(map(str, version))
+name = "Ogres vs. Cellular Automata"
 
 # standard Java modules
 import java
@@ -61,6 +62,11 @@ class Flying:
 
 class Item:
 	def __init__(self, game, hex, treadable):
+		"""
+		@precondition `hex' must not be None.: hex is not None
+		"""
+		assert hex is not None, "precondition: `hex' must not be None."
+
 		# print "Item.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		self.game = game
 		self.hb = self.game.hb
@@ -109,7 +115,12 @@ class Graphical (Item):
 	IMAGEDEFAULT = None
 	IMAGEPADDING = 10 # A hackish kludge until scaling works better.
 
-	def __init__(self, game, hex, treadable, color=Color.BLACK, image=None):
+	def __init__(self, game, hex, treadable, color=Color.black, image=None):
+		"""
+		@precondition `hex' must not be None.: hex is not None
+		"""
+		assert hex is not None, "precondition: `hex' must not be None."
+
 		# print "Graphical.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		self.image = image or self.IMAGEDEFAULT or Images.getImageCache().get(self.__class__.__name__)
 		self.color = color
@@ -129,7 +140,7 @@ class Graphical (Item):
 						self.imageobserver)
 
 class Active(Graphical):
-	def __init__(self, game, hex, color=Color.BLACK):
+	def __init__(self, game, hex, color=Color.black):
 		# print "Active.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		pass
 
@@ -139,7 +150,7 @@ class Active(Graphical):
 	def paint(self, g):
 		mg = g.create()
 		if self.is_selected():
-			mg.setColor(Color.YELLOW)
+			mg.setColor(Color.yellow)
 			mg.draw(self.hb.hexinnerpoly)
 
 	def mouse_pressed(self):
@@ -186,7 +197,7 @@ DEFAULT_NUM_SPLATTERS=8
 class Attackable(Graphical):
 	IMAGEDEAD = None
 	
-	def __init__(self, hp, defense, numsplatters=DEFAULT_NUM_SPLATTERS, bloodcolor=Color.RED, deadimage=None):
+	def __init__(self, hp, defense, numsplatters=DEFAULT_NUM_SPLATTERS, bloodcolor=Color.red, deadimage=None):
 		# print "Attackable.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		self.defensedice = defense
 		self.hp = hp
@@ -214,7 +225,7 @@ class Attackable(Graphical):
 				strhp = str(self.hp)
 				(font, ox, oy,) = self.hb.find_fitting_font_nw_vertex(strhp, mg)
 				# (font, ox, oy,) = self.hb.find_fitting_font_bottom_half(strhp, mg)
-				mg.setColor(Color.WHITE)
+				mg.setColor(Color.white)
 				mg.setFont(font)
 				mg.drawString(strhp, ox, oy)
 
@@ -272,7 +283,12 @@ class Attackable(Graphical):
 		return Item.is_treadable(self, treader)
 
 class Stone(Attackable):
-	def __init__(self, game, hex, treadable="flying only", color=Color.GRAY):
+	def __init__(self, game, hex, treadable="flying only", color=Color.gray):
+		"""
+		@precondition `hex' must not be None.: hex is not None
+		"""
+		assert hex is not None, "precondition: `hex' must not be None."
+
 		# print "Stone.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		Attackable.__init__(self, hp=1, defense=1, numsplatters=0, bloodcolor=color)
 		Graphical.__init__(self, game, hex, treadable, color=color)
@@ -292,7 +308,7 @@ class Stone(Attackable):
 		self.hex.repaint()
 		
 class Creature(Attackable, Active):
-	def __init__(self, game, hex, hp, actpoints, attack, defense, numsplatters=DEFAULT_NUM_SPLATTERS, color=Color.BLACK, bloodcolor=Color.RED, deadimage=None):
+	def __init__(self, game, hex, hp, actpoints, attack, defense, numsplatters=DEFAULT_NUM_SPLATTERS, color=Color.black, bloodcolor=Color.red, deadimage=None):
 		"""
 		@param game the Ogres vs Pixies game
 		@param hex the hex the creature inhabits
@@ -427,7 +443,7 @@ class Creature(Attackable, Active):
 		defender.handle_attack(attdice)
 
 class Ogre(Creature):
-	def __init__(self, game, hex, bloodcolor=Color.RED):
+	def __init__(self, game, hex, bloodcolor=Color.red):
 		# print "Ogre.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		Creature.__init__(self, game, hex, hp=3, actpoints=1, attack=3, defense=2, bloodcolor=bloodcolor)
 
@@ -450,7 +466,7 @@ class Ogre(Creature):
 		self.repaint()
 
 class Tree(Graphical):
-	def __init__(self, ovp, hex, treadable="all", color=Color.BLACK):
+	def __init__(self, ovp, hex, treadable="all", color=Color.black):
 		# print "Tree.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		Graphical.__init__(self, ovp, hex, treadable=treadable, color=color)
 		for adjhex in hex.get_adjacent_hexes():
@@ -471,13 +487,13 @@ class Tree(Graphical):
 	def paint(self, g):
 		Graphical.paint(self, g)
 		mg = g.create()
-		mg.setColor(Color.BLACK)
+		mg.setColor(Color.black)
 		mg.draw(self.hb.treepoly)
-		mg.setColor(Color.GREEN)
+		mg.setColor(Color.green)
 		mg.fill(self.hb.treeinnerpoly)
 
 class Pixie(Creature, Flying):
-	def __init__(self, ovp, hex, color=Color.WHITE, hp=1, bloodcolor=Color(0.7, 1.0, 0.3)):
+	def __init__(self, ovp, hex, color=Color.white, hp=1, bloodcolor=Color(0.7, 1.0, 0.3)):
 		# print "Pixie.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		self.carrieditems = []
 		Creature.__init__(self, ovp, hex, hp=hp, actpoints=3, attack=1, defense=1, color=color, bloodcolor=bloodcolor)
@@ -509,18 +525,16 @@ class Pixie(Creature, Flying):
 			self.repaint()
 			self.hex.repaint()
 
-	def user_act(self, hex):
-		"""
-		The user has selected you, and then selected `hex'.  Try to do something to it!
+##	def user_act(self, hex):
+##		"""
+##		The user has selected you, and then selected `hex'.  Try to do something to it!
+##		"""
+##		if hex is None:
+##			return
 
-		(Try to move onto it, if that fails try to attack it.)
-		"""
-		if hex is None:
-			return
-
-		# If it is ourself, then do gardening.
-		if hex is self.hex:
-			self.garden()
-		else:
-			Creature.user_act(self, hex)
+##		# If it is ourself, then do gardening.
+##		if hex is self.hex:
+##			self.garden()
+##		else:
+##			Creature.user_act(self, hex)
 

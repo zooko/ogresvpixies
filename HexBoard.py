@@ -1,4 +1,4 @@
-CVS_ID = '$Id: HexBoard.py,v 1.1 2002/01/25 16:36:01 zooko Exp $'
+CVS_ID = '$Id: HexBoard.py,v 1.2 2002/01/29 22:48:48 zooko Exp $'
 
 import java
 from java.awt import *
@@ -121,7 +121,7 @@ def shortest_path(src, dst, hopsleft=None):
 			return (w_of(src),) + shortest_path(w_of(src), dst, hopsleft)
 
 class Hex:
-	def __init__(self, hb, hx, hy, bordercolor=Color.GREEN, bgcolor=Color.BLACK, hicolor=Color.PINK):
+	def __init__(self, hb, hx, hy, bordercolor=Color.green, bgcolor=Color.black, hicolor=Color.pink):
 		self.bordercolor = bordercolor
 		self.bgcolor = bgcolor
 		self.hicolor = hicolor
@@ -183,6 +183,7 @@ class Hex:
 		return false
 
 	def get_adjacent_hexes(self):
+		# XXX speed me up please!
 		return filter(self.is_adjacent, self.hb.hexes.values())
 
 	def get_ordered_adjacent_hexes(self):

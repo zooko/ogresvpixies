@@ -22,7 +22,7 @@
 # See the file COPYING or visit http://www.gnu.org/ for details.
 
 # CVS:
-__cvsid = '$Id: OvP.py,v 1.1 2002/01/25 16:36:01 zooko Exp $'
+__cvsid = '$Id: OvP.py,v 1.2 2002/01/29 22:48:48 zooko Exp $'
 
 import path_fix
 version = (0, 0, 2,)
@@ -57,11 +57,12 @@ false = 0
 
 NUM_STARTING_OGRES=2
 NUM_STARTING_PIXIES=2
-NUM_STARTING_TREES=4
+NUM_STARTING_TREES=22
 
 class OvPHex(HexBoard.Hex):
-	def __init__(self, hb, hx, hy, bordercolor=Color.GREEN, bgcolor=Color.BLACK):
+	def __init__(self, hb, hx, hy, bordercolor=Color.green, bgcolor=Color.black):
 		HexBoard.Hex.__init__(self, hb, hx, hy, bordercolor, bgcolor)
+		self._nextnumneighbors = 0
 
 	def is_center_of_broken_pixie_ring(hex):
 		return (hex.is_empty() or hex.contains_only(Stone)) and \
@@ -93,7 +94,7 @@ class OvP(JFrame, MouseListener, KeyListener, Runnable):
 		self.selecteditem = None
 		self.creatures = [] # all extant creatures, living and dead
 		self.turnmanager = Game.TurnManager(self.creatures)
-		self.turnmanager.register_regular_eot_event(self.grow_a_tree)
+		self.turnmanager.register_regular_eot_event(self.grow_trees)
 		self.turnmanager.register_regular_bot_event(self.select_next_creature)
 
 		HSLOP=30
@@ -120,37 +121,24 @@ class OvP(JFrame, MouseListener, KeyListener, Runnable):
 	def _null(self, *args, **kwargs):
 		pass
 
-	def _is_potential_clump(self, hex):
-		"""
-		@return true if, among the adjacent hexes to `hex', two of them which are adjacent to each other both contain trees
-		"""
-		adjswtrees = filter(lambda x: x.contains_a(Tree), hex.get_adjacent_hexes())
-		for a1 in adjswtrees:
-			for a2 in adjswtrees:
-				if (a1 is not a2) and (a1.is_adjacent(a2)):
-					return true
-		return false
+	def grow_trees(self):
+		for hex in self.hb.hexes.values():
+			if hex.contains_a(Tree) or hex.contains_a(Pixie):
+				for adjhex in hex.get_adjacent_hexes():
+					adjhex._nextnumneighbors += 1
 
-	def grow_a_tree(self):
-		for emptyhex in rand_rotate(filter(HexBoard.Hex.is_empty, self.hb.hexes.values())):
-			for adjhex in emptyhex.get_adjacent_hexes():
-				if adjhex.contains_a(Tree):
-					Tree(self, emptyhex)
-					# Create Stones to prevent straight-runs.
-					opphex = adjhex.get_opposite(emptyhex)
-					if opphex is not None:
-						if opphex.is_empty():
-							Stone(self, opphex)
-						# for longer runs of stones:
-						# nexthex = emptyhex.get_opposite(opphex)
-						# if (nexthex is not None) and nexthex.is_empty():
-						# 	Stone(self, nexthex)
-						# for coriolis stones:
-						# predhex = opphex.get_circle_predecessor(emptyhex)
-						# if (predhex is not None) and predhex.is_empty():
-						# 	Stone(self, predhex)
-					return
-		# If there were no appropriate spots.  No trees grow!
+		for hex in self.hb.hexes.values():
+			if hex._nextnumneighbors < 2:
+				if hex.contains_a(Tree):
+					[x.destroy() for x in hex.get_all(Tree)]
+					if not hex.contains_a(Stone):
+						Stone(self, hex)
+			elif hex._nextnumneighbors == 3:
+				if hex.is_empty():
+					Tree(self, hex)
+			elif hex._nextnumneighbors >= 4:
+				[x.destroy() for x in hex.get_all(Tree)]
+			hex._nextnumneighbors = 0
 
 	def init_locations(self):
 		for hx in range(self.boardwidth):
@@ -163,13 +151,21 @@ class OvP(JFrame, MouseListener, KeyListener, Runnable):
 			if hex is not None:
 				Ogre(self, hex)
 		for i in range(NUM_STARTING_PIXIES):
-			hex = self.hb.get_empty_hex(minhx=self.boardwidth/3)
+			hex = self.hb.get_empty_hex(minhx=self.boardwidth*3/4)
 			if hex is not None:
 				Pixie(self, hex)
 		for i in range(NUM_STARTING_TREES):
 			hex = self.hb.get_empty_hex(minhx=self.boardwidth/3)
 			if hex is not None:
 				Tree(self, hex)
+				if rand_int(2) == 0:
+					for oh in hex.get_east_trio():
+						if (oh is not None) and oh.is_empty():
+							Stone(self, oh)
+				else:
+					for oh in hex.get_west_trio():
+						if (oh is not None) and oh.is_empty():
+							Stone(self, oh)
 
 	def select_next_creature(self):
 		"""

@@ -1,3 +1,4 @@
+- Fix alpha blending so we can see occluded items
 - Images. CHECK! :-)
 - Battle Feedback.
 - Zone of Control representation. ?? :-)
