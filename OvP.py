@@ -22,7 +22,7 @@
 # See the file COPYING or visit http://www.gnu.org/ for details.
 
 # CVS:
-__cvsid = '$Id: OvP.py,v 1.3 2002/01/30 00:19:17 zooko Exp $'
+__cvsid = '$Id: OvP.py,v 1.4 2002/01/30 14:27:40 zooko Exp $'
 
 import path_fix
 
@@ -53,13 +53,13 @@ from util import *
 true = 1
 false = 0
 
-version = (1, 1, 1)
+version = (1, 2, 0)
 verstr = '.'.join(map(str, version))
 name = "Ogres vs. Cellular Automata"
 
 NUM_STARTING_OGRES=2
-NUM_STARTING_PIXIES=2
-NUM_STARTING_TREES=22
+NUM_STARTING_PIXIES=3
+NUM_STARTING_TREES=32
 
 class OvPHex(HexBoard.Hex):
 	def __init__(self, hb, hx, hy, bordercolor=Color.green, bgcolor=Color.black):
@@ -125,21 +125,28 @@ class OvP(JFrame, MouseListener, KeyListener, Runnable):
 
 	def grow_trees(self):
 		for hex in self.hb.hexes.values():
-			if hex.contains_a(Tree) or hex.contains_a(Pixie):
+			if filter(lambda x: isinstance(x, Tree) or (isinstance(x, Pixie) and not x.is_dead()), hex.items):
 				for adjhex in hex.get_adjacent_hexes():
 					adjhex._nextnumneighbors += 1
 
 		for hex in self.hb.hexes.values():
+			if hex._nextnumneighbors == 3:
+				if hex.is_empty():
+					Tree(self, hex)
+
+		for hex in self.hb.hexes.values():
+			[x.get_older() for x in hex.get_all(Tree)]
+
 			if hex._nextnumneighbors < 2:
 				if hex.contains_a(Tree):
 					[x.destroy() for x in hex.get_all(Tree)]
 					if not hex.contains_a(Stone):
 						Stone(self, hex)
-			elif hex._nextnumneighbors == 3:
-				if hex.is_empty():
-					Tree(self, hex)
 			elif hex._nextnumneighbors >= 4:
-				[x.destroy() for x in hex.get_all(Tree)]
+				if hex.contains_a(Tree):
+					[x.destroy() for x in hex.get_all(Tree)]
+					if not hex.contains_a(Stone):
+						Stone(self, hex)
 			hex._nextnumneighbors = 0
 
 	def init_locations(self):
@@ -160,14 +167,6 @@ class OvP(JFrame, MouseListener, KeyListener, Runnable):
 			hex = self.hb.get_empty_hex(minhx=self.boardwidth/3)
 			if hex is not None:
 				Tree(self, hex)
-				if rand_int(2) == 0:
-					for oh in hex.get_east_trio():
-						if (oh is not None) and oh.is_empty():
-							Stone(self, oh)
-				else:
-					for oh in hex.get_west_trio():
-						if (oh is not None) and oh.is_empty():
-							Stone(self, oh)
 
 	def select_next_creature(self):
 		"""

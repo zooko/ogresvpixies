@@ -22,7 +22,7 @@
 # See the file COPYING or visit http://www.gnu.org/ for details.
 
 # CVS:
-__cvsid = '$Id: GamePieces.py,v 1.3 2002/01/30 00:19:17 zooko Exp $'
+__cvsid = '$Id: GamePieces.py,v 1.4 2002/01/30 14:27:40 zooko Exp $'
 
 import path_fix
 
@@ -455,32 +455,23 @@ class Ogre(Creature):
 		self.hp += 1
 		if self.hp > self.highhp:
 			self.highhp = self.hp
-
-		# If an ogre eats a tree, then all trees adjacent to that tree immediately die of fright.
-		if isinstance(item, Tree):
-			for adjhex in item.hex.get_adjacent_hexes():
-				[x.destroy() for x in adjhex.get_all(Tree)]
 		self.repaint()
 
 class Tree(Graphical):
-	def __init__(self, ovp, hex, treadable="all", color=Color.black):
+	def __init__(self, game, hex, treadable="all", color=Color.black):
 		# print "Tree.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
-		Graphical.__init__(self, ovp, hex, treadable=treadable, color=color)
+		Graphical.__init__(self, game, hex, treadable=treadable, color=color)
+		self.age = 0
 		for adjhex in hex.get_adjacent_hexes():
 			# Destroy any adjacent stones.
 			[x.destroy() for x in adjhex.get_all(Stone)]
 
-			# Now check if this new tree just formed a Broken Pixie Ring.  If so, create a 3-Pixie there.
-			if adjhex.is_center_of_broken_pixie_ring():
-				# WHOO!  A BROKEN PIXIE RING!  Remove any Stones and create a 3-Pixie in the center of the Fairie Ring.
-				[x.destroy() for x in adjhex.get_all(Tree)]
-				Pixie(ovp, adjhex, hp=3)
-
-			# Now check if this new tree just formed a Pixie Ring.  If so, create a Pixie there.
-			if adjhex.is_center_of_pixie_ring():
-				# WHOO!  A PIXIE RING!  Remove any Stones and create a Pixie in the center of the Fairie Ring.
-				[x.destroy() for x in adjhex.get_all(Tree)]
-				Pixie(ovp, adjhex)
+	def get_older(self):
+		self.age += 1
+		if (self.age > 7) and not self.hex.contains_a(Creature):
+			Pixie(self.game, self.hex)
+			self.destroy()
+		self.repaint()
 
 	def paint(self, g):
 		Graphical.paint(self, g)
@@ -490,11 +481,18 @@ class Tree(Graphical):
 		mg.setColor(Color.green)
 		mg.fill(self.hb.treeinnerpoly)
 
+		strage = str(self.age)
+		# (font, ox, oy,) = self.hb.find_fitting_font_nw_vertex(strage, mg)
+		(font, ox, oy,) = self.hb.find_fitting_font_bottom_half(strage, mg)
+		mg.setColor(Color.gray)
+		mg.setFont(font)
+		mg.drawString(strage, ox, oy)
+
 class Pixie(Creature, Flying):
-	def __init__(self, ovp, hex, color=Color.white, hp=1, bloodcolor=Color(0.7, 1.0, 0.3)):
+	def __init__(self, game, hex, color=Color.white, hp=1, bloodcolor=Color(0.7, 1.0, 0.3)):
 		# print "Pixie.__init__(%s@%s)" % (self.__class__.__name__, id(self),)
 		self.carrieditems = []
-		Creature.__init__(self, ovp, hex, hp=hp, actpoints=3, attack=1, defense=1, color=color, bloodcolor=bloodcolor)
+		Creature.__init__(self, game, hex, hp=hp, actpoints=3, attack=1, defense=1, color=color, bloodcolor=bloodcolor)
 		Flying.__init__(self)
 
 	def garden(self):
